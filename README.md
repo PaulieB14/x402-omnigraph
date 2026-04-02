@@ -2,13 +2,12 @@
 
 Standardized, open-source subgraphs for the [x402 payment protocol](https://www.x402.org/) across 5 EVM chains. Every on-chain x402 payment settlement is queryable via GraphQL through [The Graph](https://thegraph.com/).
 
-**No canonical x402 payment subgraphs existed before this project.** The Graph has announced x402 gateway compatibility is "in development" — these subgraphs fill the gap.
 
 ## Live Deployments
 
 | Chain | Status | Studio |
 |-------|--------|--------|
-| **Base** | Syncing | [x-402-base](https://thegraph.com/studio/subgraph/x-402-base) |
+| **Base** | Syncing | In Process|
 | Ethereum | Planned | — |
 | Polygon | Planned | — |
 | Arbitrum | Planned | — |
