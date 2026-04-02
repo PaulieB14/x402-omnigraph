@@ -13,10 +13,7 @@ Standardized, open-source subgraphs for the [x402 payment protocol](https://www.
 | Arbitrum | Planned | — |
 | Optimism | Planned | — |
 
-**Query endpoint (Base):**
-```
-https://api.studio.thegraph.com/query/1745687/x-402-base/v0.3.0
-```
+
 
 ## What It Indexes
 
