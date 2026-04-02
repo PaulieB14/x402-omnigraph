@@ -1,0 +1,89 @@
+enum TransferMethod {
+  EIP3009
+  PERMIT2
+}
+
+enum AddressRole {
+  PAYER
+  RECIPIENT
+}
+
+# ─── Facilitator ────────────────────────────────────────────────────────────────
+# Mutable: isActive, aggregates change over time
+
+type Facilitator @entity {
+  id: Bytes!                       # lowercase address bytes (best practice: Bytes IDs)
+  address: Bytes!
+  name: String                     # from FacilitatorAdded event
+  userDefined_url: String          # facilitator endpoint URL
+  isActive: Boolean!
+  addedAtBlock: BigInt!
+  addedAtTimestamp: BigInt!
+  removedAtBlock: BigInt           # null if still active
+  removedAtTimestamp: BigInt       # null if still active
+
+  # Running aggregates — updated on each payment
+  totalSettlements: BigInt!
+  totalVolume: BigInt!             # atomic units of payment token
+  totalVolumeDecimal: BigDecimal!  # human-readable (e.g. USDC 6 decimals)
+
+  # Best practice: @derivedFrom avoids storing duplicate arrays
+  payments: [X402Payment!]! @derivedFrom(field: "facilitator")
+}
+
+# ─── Individual Payment ──────────────────────────────────────────────────────────
+# Best practice: immutable entity — payments never change after creation
+# Yields ~28% faster indexing and ~48% lower storage
+
+type X402Payment @entity(immutable: true) {
+  id: Bytes!                       # Bytes ID: txHash + logIndex (best practice)
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+
+  # Payment parties
+  from: Bytes!                     # payer wallet
+  to: Bytes!                       # resource server (recipient)
+  facilitator: Facilitator         # the settling facilitator (nullable for Permit2 path)
+
+  # Payment details
+  amount: BigInt!                  # atomic units
+  amountDecimal: BigDecimal!       # human-readable decimal (best practice: pair BigInt + BigDecimal)
+  asset: Bytes!                    # token contract address
+  assetSymbol: String              # e.g. "USDC"
+
+  # EIP-3009 specific
+  nonce: Bytes                     # the bytes32 nonce from the authorization
+
+  # Transfer method
+  transferMethod: TransferMethod!
+
+  # Chain context
+  chainId: BigInt!
+  network: String!                 # CAIP-2 e.g. "eip155:8453"
+}
+
+# ─── Per-Address Aggregates ──────────────────────────────────────────────────────
+
+type X402AddressSummary @entity {
+  id: Bytes!                       # Bytes ID: role prefix + address
+  address: Bytes!
+  role: AddressRole!
+  totalPayments: BigInt!
+  totalVolume: BigInt!
+  totalVolumeDecimal: BigDecimal!
+  firstPaymentTimestamp: BigInt!
+  lastPaymentTimestamp: BigInt!
+}
+
+# ─── Daily Rollups ───────────────────────────────────────────────────────────────
+
+type X402DailyStats @entity {
+  id: Bytes!                       # Bytes ID: epoch day as bytes
+  date: String!                    # YYYY-MM-DD
+  totalPayments: BigInt!
+  totalVolume: BigInt!
+  totalVolumeDecimal: BigDecimal!
+  eip3009Payments: BigInt!
+  permit2Payments: BigInt!
+}

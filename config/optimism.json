@@ -1,0 +1,10 @@
+{
+  "network": "optimism",
+  "chainId": 10,
+  "caip2": "eip155:10",
+  "usdcAddress": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+  "usdcStartBlock": 108009463,
+  "registryAddress": "0x0000000000000000000000000000000000402002",
+  "registryStartBlock": 0,
+  "hasPermit2Proxy": false
+}

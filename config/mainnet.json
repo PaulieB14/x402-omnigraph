@@ -1,0 +1,12 @@
+{
+  "network": "mainnet",
+  "chainId": 1,
+  "caip2": "eip155:1",
+  "usdcAddress": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+  "usdcStartBlock": 6082465,
+  "registryAddress": "0x0000000000000000000000000000000000402002",
+  "registryStartBlock": 0,
+  "permit2ProxyAddress": "0x402085c248EeA27D92E8b30b2C58ed07f9E20001",
+  "permit2ProxyStartBlock": 24779550,
+  "hasPermit2Proxy": true
+}

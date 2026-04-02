@@ -1,0 +1,12 @@
+{
+  "network": "matic",
+  "chainId": 137,
+  "caip2": "eip155:137",
+  "usdcAddress": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+  "usdcStartBlock": 51344224,
+  "registryAddress": "0x0000000000000000000000000000000000402002",
+  "registryStartBlock": 0,
+  "permit2ProxyAddress": "0x402085c248EeA27D92E8b30b2C58ed07f9E20001",
+  "permit2ProxyStartBlock": 84076316,
+  "hasPermit2Proxy": true
+}

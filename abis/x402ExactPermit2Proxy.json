@@ -1,0 +1,14 @@
+[
+  {
+    "type": "event",
+    "name": "Settled",
+    "anonymous": false,
+    "inputs": []
+  },
+  {
+    "type": "event",
+    "name": "SettledWithPermit",
+    "anonymous": false,
+    "inputs": []
+  }
+]

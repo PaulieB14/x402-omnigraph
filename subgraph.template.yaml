@@ -1,0 +1,95 @@
+specVersion: 1.0.0
+description: x402 payment protocol subgraph — {{network}}
+repository: https://github.com/your-org/x402-subgraph
+schema:
+  file: ./schema.graphql
+
+indexerHints:
+  prune: auto
+
+# graft:
+#   base: QmPreviousDeploymentId
+#   block: 12345678
+
+dataSources:
+
+  # ── 1. FacilitatorRegistry ──────────────────────────────────────────────────
+  - kind: ethereum
+    name: FacilitatorRegistry
+    network: {{network}}
+    source:
+      address: "{{registryAddress}}"
+      abi: FacilitatorRegistry
+      startBlock: {{registryStartBlock}}
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Facilitator
+      abis:
+        - name: FacilitatorRegistry
+          file: ./abis/FacilitatorRegistry.json
+      eventHandlers:
+        - event: FacilitatorAdded(indexed address,string,string,uint256)
+          handler: handleFacilitatorAdded
+        - event: FacilitatorRemoved(indexed address,uint256)
+          handler: handleFacilitatorRemoved
+      file: ./src/registry.ts
+
+  # ── 2. USDC — EIP-3009 path ─────────────────────────────────────────────────
+  - kind: ethereum
+    name: USDC
+    network: {{network}}
+    source:
+      address: "{{usdcAddress}}"
+      abi: FiatTokenV2_2
+      startBlock: {{usdcStartBlock}}
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - X402Payment
+        - X402AddressSummary
+        - X402DailyStats
+        - Facilitator
+      abis:
+        - name: FiatTokenV2_2
+          file: ./abis/FiatTokenV2_2.json
+      eventHandlers:
+        - event: AuthorizationUsed(indexed address,indexed bytes32)
+          handler: handleAuthorizationUsed
+          receipt: true
+      file: ./src/usdc.ts
+
+{{#hasPermit2Proxy}}
+  # ── 3. x402ExactPermit2Proxy — Permit2 path ─────────────────────────────────
+  - kind: ethereum
+    name: x402Permit2Proxy
+    network: {{network}}
+    source:
+      address: "{{permit2ProxyAddress}}"
+      abi: x402ExactPermit2Proxy
+      startBlock: {{permit2ProxyStartBlock}}
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - X402Payment
+        - X402AddressSummary
+        - X402DailyStats
+        - Facilitator
+      abis:
+        - name: x402ExactPermit2Proxy
+          file: ./abis/x402ExactPermit2Proxy.json
+      eventHandlers:
+        - event: Settled()
+          handler: handleSettled
+          receipt: true
+        - event: SettledWithPermit()
+          handler: handleSettledWithPermit
+          receipt: true
+      file: ./src/permit2proxy.ts
+{{/hasPermit2Proxy}}

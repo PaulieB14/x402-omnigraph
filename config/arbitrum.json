@@ -1,0 +1,12 @@
+{
+  "network": "arbitrum-one",
+  "chainId": 42161,
+  "caip2": "eip155:42161",
+  "usdcAddress": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+  "usdcStartBlock": 120038907,
+  "registryAddress": "0x0000000000000000000000000000000000402002",
+  "registryStartBlock": 0,
+  "permit2ProxyAddress": "0x402085c248EeA27D92E8b30b2C58ed07f9E20001",
+  "permit2ProxyStartBlock": 446664190,
+  "hasPermit2Proxy": true
+}

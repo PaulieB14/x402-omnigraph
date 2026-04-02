@@ -1,0 +1,22 @@
+[
+  {
+    "type": "event",
+    "name": "FacilitatorAdded",
+    "anonymous": false,
+    "inputs": [
+      { "name": "facilitator", "type": "address", "indexed": true },
+      { "name": "name",        "type": "string",  "indexed": false },
+      { "name": "url",         "type": "string",  "indexed": false },
+      { "name": "timestamp",   "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "FacilitatorRemoved",
+    "anonymous": false,
+    "inputs": [
+      { "name": "facilitator", "type": "address", "indexed": true },
+      { "name": "timestamp",   "type": "uint256", "indexed": false }
+    ]
+  }
+]
