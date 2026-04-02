@@ -20,7 +20,7 @@ dataSources:
     source:
       address: "0x67C75c4FD5BbbF5f6286A1874fe2d7dF0024Ebe8"
       abi: FacilitatorRegistry
-      startBlock: 44152583
+      startBlock: 30011612
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -44,7 +44,7 @@ dataSources:
     source:
       address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
       abi: FiatTokenV2_2
-      startBlock: 44152583
+      startBlock: 30011612
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7

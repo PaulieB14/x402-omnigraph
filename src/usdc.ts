@@ -3,22 +3,51 @@ import { AuthorizationUsed } from '../generated/USDC/FiatTokenV2_2'
 import { Facilitator, X402Payment } from '../generated/schema'
 import {
   CHAIN_ID, NETWORK, USDC_ADDRESS, USDC_SYMBOL,
-  TRANSFER_TOPIC,
+  TRANSFER_TOPIC, ZERO_BI, ZERO_BD,
   updateFacilitatorAggregates,
   updateAddressSummary,
   updateDailyStats,
   makePaymentId,
   toDecimal
 } from './helpers'
+import { getStaticFacilitatorName } from './facilitators'
+
+// Resolve a Facilitator entity — checks store first (fast path), then falls
+// back to the compiled-in static allowlist for historical blocks before the
+// FacilitatorRegistry was deployed. Creates the entity on first encounter.
+function resolveFacilitator(address: Bytes): Facilitator | null {
+  // Fast path: entity already in store (post-registry or previously created)
+  let facilitator = Facilitator.load(address)
+  if (facilitator != null) {
+    return facilitator.isActive ? facilitator : null
+  }
+
+  // Fallback: check static allowlist (O(1) hash map lookup)
+  let name = getStaticFacilitatorName(address.toHexString().toLowerCase())
+  if (name == null) return null
+
+  // First encounter — create entity so future lookups hit the store
+  facilitator = new Facilitator(address)
+  facilitator.address = address
+  facilitator.name = name
+  facilitator.isActive = true
+  facilitator.addedAtBlock = ZERO_BI
+  facilitator.addedAtTimestamp = ZERO_BI
+  facilitator.totalSettlements = ZERO_BI
+  facilitator.totalVolume = ZERO_BI
+  facilitator.totalVolumeDecimal = ZERO_BD
+  facilitator.save()
+
+  return facilitator
+}
 
 export function handleAuthorizationUsed(event: AuthorizationUsed): void {
-  // ── GATE: only proceed if msg.sender is a registered active facilitator ──
-  // Best practice: no eth_calls — we use the subgraph store for lookups
+  // ── GATE: resolve facilitator from store or static allowlist ──────────
   let facilitatorId = event.transaction.from
-  let facilitator = Facilitator.load(facilitatorId)
-  if (facilitator == null || !facilitator.isActive) return
+  let facilitator = resolveFacilitator(facilitatorId)
+  if (facilitator == null) return
 
-  // ── Extract Transfer details from receipt logs ───────────────────────────
+  // ── Extract Transfer details from receipt logs ───────────────────────
   let receipt = event.receipt
   if (receipt == null) {
     log.warning('No receipt for tx {}', [event.transaction.hash.toHexString()])
@@ -64,8 +93,7 @@ export function handleAuthorizationUsed(event: AuthorizationUsed): void {
     return
   }
 
-  // ── Create X402Payment entity (immutable — never updated after creation) ──
-  // Best practice: Bytes ID = txHash.concatI32(logIndex)
+  // ── Create X402Payment entity ────────────────────────────────────────
   let paymentId = makePaymentId(event.transaction.hash, event.logIndex)
   let payment = new X402Payment(paymentId)
 
@@ -85,7 +113,7 @@ export function handleAuthorizationUsed(event: AuthorizationUsed): void {
   payment.network = NETWORK
   payment.save()
 
-  // ── Update aggregates ────────────────────────────────────────────────────
+  // ── Update aggregates ────────────────────────────────────────────────
   updateFacilitatorAggregates(facilitator as Facilitator, transferValue)
   updateAddressSummary(event.params.authorizer, 'PAYER', transferValue, event.block.timestamp)
   updateAddressSummary(transferTo, 'RECIPIENT', transferValue, event.block.timestamp)
