@@ -119,7 +119,7 @@ See [schema.graphql](schema.graphql) for the full schema.
 7. **BigDecimal** — paired with BigInt for human-readable volumes
 8. **Optimized start blocks** — no wasted sync on pre-x402 data
 
-## Example Queries
+## Example Query
 
 ### Recent payments
 ```graphql
@@ -135,46 +135,7 @@ See [schema.graphql](schema.graphql) for the full schema.
 }
 ```
 
-### Top recipients by volume
-```graphql
-{
-  x402AddressSummaries(
-    where: { role: RECIPIENT }
-    orderBy: totalVolume
-    orderDirection: desc
-    first: 20
-  ) {
-    address
-    totalPayments
-    totalVolumeDecimal
-  }
-}
-```
 
-### Facilitator leaderboard
-```graphql
-{
-  facilitators(orderBy: totalVolume, orderDirection: desc) {
-    name
-    isActive
-    totalSettlements
-    totalVolumeDecimal
-  }
-}
-```
-
-### Daily stats
-```graphql
-{
-  x402DailyStats_collection(orderBy: id, orderDirection: desc, first: 7) {
-    date
-    totalPayments
-    totalVolumeDecimal
-    eip3009Payments
-    permit2Payments
-  }
-}
-```
 
 ## Multi-Chain Deploy
 
