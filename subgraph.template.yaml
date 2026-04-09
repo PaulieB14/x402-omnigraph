@@ -51,7 +51,6 @@ dataSources:
       language: wasm/assemblyscript
       entities:
         - X402Payment
-        - X402TransferEvent
         - X402AddressSummary
         - X402DailyStats
         - Facilitator
@@ -62,8 +61,6 @@ dataSources:
         - event: AuthorizationUsed(indexed address,indexed bytes32)
           handler: handleAuthorizationUsed
           receipt: true
-        - event: Transfer(indexed address,indexed address,uint256)
-          handler: handleTransfer
       file: ./src/usdc.ts
 
 {{#hasPermit2Proxy}}

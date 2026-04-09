@@ -108,16 +108,24 @@ export function updateDailyStats(
 }
 
 // ── Transfer-event daily stats (matches x402scan methodology) ────────────────
-export function updateTransferDailyStats(timestamp: BigInt, amount: BigInt): void {
+// Called from handleAuthorizationUsed after scanning the receipt — we pass
+// the aggregated count + volume of ALL USDC Transfer logs in the same tx.
+// This avoids needing a separate Transfer event handler (which would require
+// indexing every USDC Transfer on Base — billions of events, days to sync).
+export function bumpTransferCounters(
+  timestamp: BigInt,
+  transferCount: BigInt,
+  transferVolume: BigInt
+): void {
   let epochDay = timestamp.div(SECONDS_PER_DAY)
   let dayId = makeDayId(epochDay)
   let stats = X402DailyStats.load(dayId)
   if (stats == null) {
     stats = newDailyStats(dayId, epochDay)
   }
-  stats.transferEvents = stats.transferEvents.plus(ONE_BI)
-  stats.transferVolume = stats.transferVolume.plus(amount)
-  stats.transferVolumeDecimal = stats.transferVolumeDecimal.plus(toDecimal(amount))
+  stats.transferEvents = stats.transferEvents.plus(transferCount)
+  stats.transferVolume = stats.transferVolume.plus(transferVolume)
+  stats.transferVolumeDecimal = stats.transferVolumeDecimal.plus(toDecimal(transferVolume))
   stats.save()
 }
 

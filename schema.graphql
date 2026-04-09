@@ -63,35 +63,6 @@ type X402Payment @entity(immutable: true) {
   network: String!                 # CAIP-2 e.g. "eip155:8453"
 }
 
-# ─── Raw Transfer Events ────────────────────────────────────────────────────────
-# Counts every USDC Transfer event whose tx.from is a registered facilitator.
-# This matches x402scan's counting methodology — one settlement can produce
-# multiple Transfer events (e.g. main transfer + fee transfer + change return),
-# whereas X402Payment counts unique authorized settlements (1 per AuthorizationUsed).
-# Both metrics are useful: X402Payment = unique payments, X402TransferEvent = raw transfers.
-
-type X402TransferEvent @entity(immutable: true) {
-  id: Bytes!                       # Bytes ID: txHash + logIndex
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-
-  # Transfer event parties (from the Transfer log itself)
-  from: Bytes!                     # Transfer.from
-  to: Bytes!                       # Transfer.to
-  facilitator: Facilitator!        # the facilitator that submitted the tx (always set, since gated by registry)
-
-  # Amounts
-  amount: BigInt!                  # atomic units
-  amountDecimal: BigDecimal!       # human-readable
-  asset: Bytes!                    # token contract address
-  assetSymbol: String              # e.g. "USDC"
-
-  # Chain context
-  chainId: BigInt!
-  network: String!                 # CAIP-2
-}
-
 # ─── Per-Address Aggregates ──────────────────────────────────────────────────────
 
 type X402AddressSummary @entity(immutable: false) {
@@ -116,8 +87,11 @@ type X402DailyStats @entity(immutable: false) {
   eip3009Payments: BigInt!
   permit2Payments: BigInt!
 
-  # Raw Transfer-event counts (matches x402scan methodology — typically ~1.5×
-  # totalPayments because a single settlement can emit multiple Transfer events)
+  # Raw USDC Transfer-event counts derived from receipt scanning inside
+  # handleAuthorizationUsed — matches x402scan's methodology. A single x402
+  # settlement can emit multiple Transfer events (main transfer + fee + change),
+  # so transferEvents is typically ~1.5× totalPayments. transferVolume sums
+  # ALL Transfer log values in those receipts (also matches x402scan).
   transferEvents: BigInt!
   transferVolume: BigInt!
   transferVolumeDecimal: BigDecimal!

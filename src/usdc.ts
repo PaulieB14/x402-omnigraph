@@ -1,13 +1,13 @@
 import { Address, BigInt, Bytes, log } from '@graphprotocol/graph-ts'
-import { AuthorizationUsed, Transfer } from '../generated/USDC/FiatTokenV2_2'
-import { Facilitator, X402Payment, X402TransferEvent } from '../generated/schema'
+import { AuthorizationUsed } from '../generated/USDC/FiatTokenV2_2'
+import { Facilitator, X402Payment } from '../generated/schema'
 import {
   CHAIN_ID, NETWORK, USDC_ADDRESS, USDC_SYMBOL,
   TRANSFER_TOPIC, ZERO_BI, ZERO_BD,
   updateFacilitatorAggregates,
   updateAddressSummary,
   updateDailyStats,
-  updateTransferDailyStats,
+  bumpTransferCounters,
   makePaymentId,
   toDecimal
 } from './helpers'
@@ -55,9 +55,19 @@ export function handleAuthorizationUsed(event: AuthorizationUsed): void {
     return
   }
 
+  // We do TWO things in one pass through the receipt logs:
+  //   1. Find the specific Transfer log where from == authorizer (the actual
+  //      x402 settlement) — this populates the X402Payment entity
+  //   2. Count ALL USDC Transfer logs in the same tx + sum their values
+  //      (matches x402scan's methodology — fees, change return, main transfer
+  //      all count as separate "transactions" in their UI)
   let found = false
   let transferTo = Address.zero()
   let transferValue = BigInt.zero()
+
+  // Aggregates across ALL Transfer logs in this receipt (for daily stats)
+  let allTransferCount = 0
+  let allTransferVolume = BigInt.zero()
 
   for (let i = 0; i < receipt.logs.length; i++) {
     let receiptLog = receipt.logs[i]
@@ -66,24 +76,29 @@ export function handleAuthorizationUsed(event: AuthorizationUsed): void {
     if (!receiptLog.address.equals(USDC_ADDRESS)) continue
     if (!receiptLog.topics[0].equals(TRANSFER_TOPIC)) continue
 
-    let logFrom = Address.fromBytes(
-      Bytes.fromUint8Array(receiptLog.topics[1].slice(12))
-    )
-
-    if (!logFrom.equals(event.params.authorizer)) continue
-
-    transferTo = Address.fromBytes(
-      Bytes.fromUint8Array(receiptLog.topics[2].slice(12))
-    )
-
+    // Decode the value from the data field (32-byte big-endian)
     let dataBytes = receiptLog.data
     let reversed = new Uint8Array(dataBytes.length)
     for (let j = 0; j < dataBytes.length; j++) {
       reversed[j] = dataBytes[dataBytes.length - 1 - j]
     }
-    transferValue = BigInt.fromUnsignedBytes(Bytes.fromUint8Array(reversed))
-    found = true
-    break
+    let logValue = BigInt.fromUnsignedBytes(Bytes.fromUint8Array(reversed))
+
+    // Tally for x402scan-style metrics (every USDC transfer in the tx)
+    allTransferCount += 1
+    allTransferVolume = allTransferVolume.plus(logValue)
+
+    // Check if this is the main authorized transfer (from == authorizer)
+    let logFrom = Address.fromBytes(
+      Bytes.fromUint8Array(receiptLog.topics[1].slice(12))
+    )
+    if (!found && logFrom.equals(event.params.authorizer)) {
+      transferTo = Address.fromBytes(
+        Bytes.fromUint8Array(receiptLog.topics[2].slice(12))
+      )
+      transferValue = logValue
+      found = true
+    }
   }
 
   if (!found) {
@@ -119,41 +134,14 @@ export function handleAuthorizationUsed(event: AuthorizationUsed): void {
   updateAddressSummary(event.params.authorizer, 'PAYER', transferValue, event.block.timestamp)
   updateAddressSummary(transferTo, 'RECIPIENT', transferValue, event.block.timestamp)
   updateDailyStats(event.block.timestamp, transferValue, true)
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// handleTransfer — counts every USDC Transfer event whose tx.from is a
-// registered facilitator. This matches x402scan's counting methodology where
-// a single settlement can produce multiple Transfer events (main transfer +
-// fee transfer + change return), inflating raw counts ~1.5× vs unique payments.
-//
-// The X402Payment entity (from handleAuthorizationUsed) still counts UNIQUE
-// settlements. X402TransferEvent counts the raw Transfer logs. Both metrics
-// are exposed so dashboards can show either view.
-// ─────────────────────────────────────────────────────────────────────────────
-export function handleTransfer(event: Transfer): void {
-  // ── GATE: tx.from must be a registered facilitator ──────────────────
-  let facilitatorId = event.transaction.from
-  let facilitator = resolveFacilitator(facilitatorId)
-  if (facilitator == null) return
-
-  // ── Create X402TransferEvent entity ─────────────────────────────────
-  let id = makePaymentId(event.transaction.hash, event.logIndex)
-  let xfer = new X402TransferEvent(id)
-  xfer.blockNumber = event.block.number
-  xfer.blockTimestamp = event.block.timestamp
-  xfer.transactionHash = event.transaction.hash
-  xfer.from = event.params.from
-  xfer.to = event.params.to
-  xfer.facilitator = facilitatorId
-  xfer.amount = event.params.value
-  xfer.amountDecimal = toDecimal(event.params.value)
-  xfer.asset = USDC_ADDRESS
-  xfer.assetSymbol = USDC_SYMBOL
-  xfer.chainId = CHAIN_ID
-  xfer.network = NETWORK
-  xfer.save()
-
-  // ── Update transfer-event daily rollup (separate from payment rollup) ──
-  updateTransferDailyStats(event.block.timestamp, event.params.value)
+  // ── Bump x402scan-style transfer counters from receipt scan ─────────
+  // (allTransferCount/allTransferVolume = ALL Transfer logs in this tx,
+  //  populated during the receipt scan above. No extra event subscription
+  //  needed — we already had `receipt: true` on AuthorizationUsed.)
+  bumpTransferCounters(
+    event.block.timestamp,
+    BigInt.fromI32(allTransferCount),
+    allTransferVolume
+  )
 }
