@@ -11,7 +11,7 @@ enum AddressRole {
 # ─── Facilitator ────────────────────────────────────────────────────────────────
 # Mutable: isActive, aggregates change over time
 
-type Facilitator @entity {
+type Facilitator @entity(immutable: false) {
   id: Bytes!                       # lowercase address bytes (best practice: Bytes IDs)
   address: Bytes!
   name: String                     # from FacilitatorAdded event
@@ -63,9 +63,38 @@ type X402Payment @entity(immutable: true) {
   network: String!                 # CAIP-2 e.g. "eip155:8453"
 }
 
+# ─── Raw Transfer Events ────────────────────────────────────────────────────────
+# Counts every USDC Transfer event whose tx.from is a registered facilitator.
+# This matches x402scan's counting methodology — one settlement can produce
+# multiple Transfer events (e.g. main transfer + fee transfer + change return),
+# whereas X402Payment counts unique authorized settlements (1 per AuthorizationUsed).
+# Both metrics are useful: X402Payment = unique payments, X402TransferEvent = raw transfers.
+
+type X402TransferEvent @entity(immutable: true) {
+  id: Bytes!                       # Bytes ID: txHash + logIndex
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+
+  # Transfer event parties (from the Transfer log itself)
+  from: Bytes!                     # Transfer.from
+  to: Bytes!                       # Transfer.to
+  facilitator: Facilitator!        # the facilitator that submitted the tx (always set, since gated by registry)
+
+  # Amounts
+  amount: BigInt!                  # atomic units
+  amountDecimal: BigDecimal!       # human-readable
+  asset: Bytes!                    # token contract address
+  assetSymbol: String              # e.g. "USDC"
+
+  # Chain context
+  chainId: BigInt!
+  network: String!                 # CAIP-2
+}
+
 # ─── Per-Address Aggregates ──────────────────────────────────────────────────────
 
-type X402AddressSummary @entity {
+type X402AddressSummary @entity(immutable: false) {
   id: Bytes!                       # Bytes ID: role prefix + address
   address: Bytes!
   role: AddressRole!
@@ -78,7 +107,7 @@ type X402AddressSummary @entity {
 
 # ─── Daily Rollups ───────────────────────────────────────────────────────────────
 
-type X402DailyStats @entity {
+type X402DailyStats @entity(immutable: false) {
   id: Bytes!                       # Bytes ID: epoch day as bytes
   date: String!                    # YYYY-MM-DD
   totalPayments: BigInt!
@@ -86,4 +115,10 @@ type X402DailyStats @entity {
   totalVolumeDecimal: BigDecimal!
   eip3009Payments: BigInt!
   permit2Payments: BigInt!
+
+  # Raw Transfer-event counts (matches x402scan methodology — typically ~1.5×
+  # totalPayments because a single settlement can emit multiple Transfer events)
+  transferEvents: BigInt!
+  transferVolume: BigInt!
+  transferVolumeDecimal: BigDecimal!
 }

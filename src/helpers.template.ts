@@ -94,13 +94,7 @@ export function updateDailyStats(
 
   let stats = X402DailyStats.load(dayId)
   if (stats == null) {
-    stats = new X402DailyStats(dayId)
-    stats.date = epochDayToDateString(epochDay)
-    stats.totalPayments = ZERO_BI
-    stats.totalVolume = ZERO_BI
-    stats.totalVolumeDecimal = ZERO_BD
-    stats.eip3009Payments = ZERO_BI
-    stats.permit2Payments = ZERO_BI
+    stats = newDailyStats(dayId, epochDay)
   }
   stats.totalPayments = stats.totalPayments.plus(ONE_BI)
   stats.totalVolume = stats.totalVolume.plus(amount)
@@ -111,6 +105,35 @@ export function updateDailyStats(
     stats.permit2Payments = stats.permit2Payments.plus(ONE_BI)
   }
   stats.save()
+}
+
+// ── Transfer-event daily stats (matches x402scan methodology) ────────────────
+export function updateTransferDailyStats(timestamp: BigInt, amount: BigInt): void {
+  let epochDay = timestamp.div(SECONDS_PER_DAY)
+  let dayId = makeDayId(epochDay)
+  let stats = X402DailyStats.load(dayId)
+  if (stats == null) {
+    stats = newDailyStats(dayId, epochDay)
+  }
+  stats.transferEvents = stats.transferEvents.plus(ONE_BI)
+  stats.transferVolume = stats.transferVolume.plus(amount)
+  stats.transferVolumeDecimal = stats.transferVolumeDecimal.plus(toDecimal(amount))
+  stats.save()
+}
+
+// ── Construct a fresh X402DailyStats with all fields zeroed ──────────────────
+function newDailyStats(dayId: Bytes, epochDay: BigInt): X402DailyStats {
+  let stats = new X402DailyStats(dayId)
+  stats.date = epochDayToDateString(epochDay)
+  stats.totalPayments = ZERO_BI
+  stats.totalVolume = ZERO_BI
+  stats.totalVolumeDecimal = ZERO_BD
+  stats.eip3009Payments = ZERO_BI
+  stats.permit2Payments = ZERO_BI
+  stats.transferEvents = ZERO_BI
+  stats.transferVolume = ZERO_BI
+  stats.transferVolumeDecimal = ZERO_BD
+  return stats
 }
 
 // ── Date string helper ───────────────────────────────────────────────────────

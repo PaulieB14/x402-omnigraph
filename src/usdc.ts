@@ -1,12 +1,13 @@
 import { Address, BigInt, Bytes, log } from '@graphprotocol/graph-ts'
-import { AuthorizationUsed } from '../generated/USDC/FiatTokenV2_2'
-import { Facilitator, X402Payment } from '../generated/schema'
+import { AuthorizationUsed, Transfer } from '../generated/USDC/FiatTokenV2_2'
+import { Facilitator, X402Payment, X402TransferEvent } from '../generated/schema'
 import {
   CHAIN_ID, NETWORK, USDC_ADDRESS, USDC_SYMBOL,
   TRANSFER_TOPIC, ZERO_BI, ZERO_BD,
   updateFacilitatorAggregates,
   updateAddressSummary,
   updateDailyStats,
+  updateTransferDailyStats,
   makePaymentId,
   toDecimal
 } from './helpers'
@@ -118,4 +119,41 @@ export function handleAuthorizationUsed(event: AuthorizationUsed): void {
   updateAddressSummary(event.params.authorizer, 'PAYER', transferValue, event.block.timestamp)
   updateAddressSummary(transferTo, 'RECIPIENT', transferValue, event.block.timestamp)
   updateDailyStats(event.block.timestamp, transferValue, true)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// handleTransfer — counts every USDC Transfer event whose tx.from is a
+// registered facilitator. This matches x402scan's counting methodology where
+// a single settlement can produce multiple Transfer events (main transfer +
+// fee transfer + change return), inflating raw counts ~1.5× vs unique payments.
+//
+// The X402Payment entity (from handleAuthorizationUsed) still counts UNIQUE
+// settlements. X402TransferEvent counts the raw Transfer logs. Both metrics
+// are exposed so dashboards can show either view.
+// ─────────────────────────────────────────────────────────────────────────────
+export function handleTransfer(event: Transfer): void {
+  // ── GATE: tx.from must be a registered facilitator ──────────────────
+  let facilitatorId = event.transaction.from
+  let facilitator = resolveFacilitator(facilitatorId)
+  if (facilitator == null) return
+
+  // ── Create X402TransferEvent entity ─────────────────────────────────
+  let id = makePaymentId(event.transaction.hash, event.logIndex)
+  let xfer = new X402TransferEvent(id)
+  xfer.blockNumber = event.block.number
+  xfer.blockTimestamp = event.block.timestamp
+  xfer.transactionHash = event.transaction.hash
+  xfer.from = event.params.from
+  xfer.to = event.params.to
+  xfer.facilitator = facilitatorId
+  xfer.amount = event.params.value
+  xfer.amountDecimal = toDecimal(event.params.value)
+  xfer.asset = USDC_ADDRESS
+  xfer.assetSymbol = USDC_SYMBOL
+  xfer.chainId = CHAIN_ID
+  xfer.network = NETWORK
+  xfer.save()
+
+  // ── Update transfer-event daily rollup (separate from payment rollup) ──
+  updateTransferDailyStats(event.block.timestamp, event.params.value)
 }
